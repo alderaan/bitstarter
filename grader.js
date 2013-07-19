@@ -68,6 +68,7 @@ var cheerioHtmlFile1 = function(htmlfile) {
         
 };
 
+//here, the json string from checks.json is parsed into a normal string
 var loadChecks = function(checksfile) {
     return JSON.parse(fs.readFileSync(checksfile));
 };
