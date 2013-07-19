@@ -22,31 +22,60 @@ References:
 */
 
 var fs = require('fs');
+var rest = require('restler');
 var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
-
+var URL_DEFAULT = "http://google.com";
 var assertFileExists = function(infile) {
     var instr = infile.toString();
     if(!fs.existsSync(instr)) {
 	console.log("%s does not exist. Exiting.", instr);
-	process.exit(1); // http://nodejs.org/api/process.html#process_process_exit_code
+	//process.exit(1); // http://nodejs.org/api/process.html#process_process_exit_code
     }
     return instr;
 };
 
+
+//here I get the website of interest
+var websitesuperchecker = function(apiurl, checksfile) {
+
+    rest.get(apiurl).on('complete', function(result) {
+	if (result instanceof Error) {
+	    console.log('Error: ' + result.message);
+	    this.retry(5000); // try again after 5 sec
+	    process.exit(1);
+	} else {
+	//return result;
+	//Careful! restler works asynchronously. I only proceed once restler gives the response
+	    checkHtmlFile1(result,checksfile);
+	
+ 	}
+    });
+};
+
+
+//I use this for files as input
 var cheerioHtmlFile = function(htmlfile) {
     return cheerio.load(fs.readFileSync(htmlfile));
+        
+};
+
+//I use this for urls as input
+var cheerioHtmlFile1 = function(htmlfile) {
+    return cheerio.load(htmlfile);
+        
 };
 
 var loadChecks = function(checksfile) {
     return JSON.parse(fs.readFileSync(checksfile));
 };
 
+//I use this for files as input 
 var checkHtmlFile = function(htmlfile, checksfile) {
-    $ = cheerioHtmlFile(htmlfile);
-    var checks = loadChecks(checksfile).sort();
+   $ = cheerioHtmlFile(htmlfile);
+var checks = loadChecks(checksfile).sort();
     var out = {};
     for(var ii in checks) {
 	var present = $(checks[ii]).length > 0;
@@ -54,6 +83,21 @@ var checkHtmlFile = function(htmlfile, checksfile) {
     }
     return out;
 };
+
+//I use this for urls as input
+var checkHtmlFile1 = function(htmlfile, checksfile) {
+   $ = cheerioHtmlFile1(htmlfile);
+    var checks = loadChecks(checksfile).sort();
+    var out = {};
+    for(var ii in checks) {
+	var present = $(checks[ii]).length > 0;
+	out[checks[ii]] = present;
+    }
+    var outJson1 = JSON.stringify(out, null, 4);
+    console.log(outJson1);
+    //return out;
+};
+
 
 var clone = function(fn) {
     // Workaround for commander.js issue.
@@ -65,10 +109,18 @@ if(require.main == module) {
     program
 	.option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
 	.option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+	.option('-u, --url <url>', 'URL to check')
 	.parse(process.argv);
+    if (program.url) {
+	websitesuperchecker(program.url, program.checks)
+	}
+    else {
     var checkJson = checkHtmlFile(program.file, program.checks);
     var outJson = JSON.stringify(checkJson, null, 4);
     console.log(outJson);
-} else {
+	}
+} 
+
+else {
     exports.checkHtmlFile = checkHtmlFile;
 }
